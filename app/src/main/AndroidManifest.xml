@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Couchbaselite_syncgateway"
+        tools:targetApi="31">
+
+        <!-- MainActivity: the launcher/home screen -->
+        <activity
+            android:name=".ui.theme.mainscreen.MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Couchbaselite_syncgateway">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- CreateActivity: for inserting new documents -->
+        <activity
+            android:name=".ui.theme.createdocument.CreateActivity"
+            android:exported="false"
+            android:label="Insert Document"
+            android:theme="@style/Theme.Couchbaselite_syncgateway" />
+
+        <!-- ResultsActivity: for viewing documents -->
+        <activity
+            android:name=".ui.theme.viewdocument.ResultsActivity"
+            android:exported="false"
+            android:label="View Documents"
+            android:theme="@style/Theme.Couchbaselite_syncgateway" />
+
+    </application>
+
+</manifest>
