@@ -10,6 +10,7 @@ import androidx.appcompat.widget.Toolbar
 import com.example.couchbaselite_syncgateway.R
 import com.example.couchbaselite_syncgateway.data.database.DBManager
 import com.couchbase.lite.MutableDocument
+import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 
@@ -55,26 +56,70 @@ class CreateActivity : AppCompatActivity() {
             // Check if user-entered ID already exists (only if an ID was provided)
             if (docIdInput.isNotEmpty()) {
                 if (dbManager.collection?.getDocument(docIdInput) != null) {
-                    Toast.makeText(this, "Document with ID '$docIdInput' already exists.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this,
+                        "Document with ID '$docIdInput' already exists.",
+                        Toast.LENGTH_SHORT
+                    ).show()
                     return@setOnClickListener
                 }
             }
 
             try {
-                val jsonObject = JSONObject(jsonInput)
                 val mutableDocument = if (docIdInput.isNotEmpty()) {
                     MutableDocument(docIdInput)
                 } else {
                     MutableDocument()
                 }
-                val keys = jsonObject.keys()
-                while (keys.hasNext()) {
-                    val key = keys.next()
-                    mutableDocument.setValue(key, jsonObject.get(key))
+
+                val trimmedInput = jsonInput.trim()
+                if (trimmedInput.startsWith("[")) {
+                    // Input is a JSON array
+                    val jsonArray = JSONArray(trimmedInput)
+                    val list = mutableListOf<Any>()
+                    for (i in 0 until jsonArray.length()) {
+                        list.add(jsonArray.get(i))
+                    }
+                    // Save the list under the key "list"
+                    mutableDocument.setValue("list", list)
+                } else if (trimmedInput.startsWith("{")) {
+                    // Input is a JSON object; expect it to have a single key with an array value
+                    val jsonObject = JSONObject(trimmedInput)
+                    if (jsonObject.length() != 1) {
+                        Toast.makeText(
+                            this,
+                            "JSON object must have a single key with an array value",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return@setOnClickListener
+                    }
+                    val key = jsonObject.keys().next()
+                    val value = jsonObject.get(key)
+                    if (value !is JSONArray) {
+                        Toast.makeText(
+                            this,
+                            "The value for key '$key' is not a JSON array",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return@setOnClickListener
+                    }
+                    val list = mutableListOf<Any>()
+                    for (i in 0 until value.length()) {
+                        list.add(value.get(i))
+                    }
+                    // Save the list under the same key
+                    mutableDocument.setValue(key, list)
+                } else {
+                    Toast.makeText(this, "Invalid JSON input", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
                 }
 
                 if (dbManager.saveDocument(mutableDocument)) {
-                    Toast.makeText(this, "Document saved: ${mutableDocument.id}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this,
+                        "Document saved: ${mutableDocument.id}",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 } else {
                     Toast.makeText(this, "Failed to save document", Toast.LENGTH_SHORT).show()
                 }
@@ -82,13 +127,13 @@ class CreateActivity : AppCompatActivity() {
                 editTextId.text.clear()
                 editTextJson.text.clear()
             } catch (e: JSONException) {
-                Toast.makeText(this, "Invalid JSON: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Invalid list input: ${e.message}", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                Toast.makeText(this, "Error saving document: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Error saving document: ${e.message}", Toast.LENGTH_SHORT)
+                    .show()
             }
         }
     }
-
     override fun onSupportNavigateUp(): Boolean {
         finish()
         return true
