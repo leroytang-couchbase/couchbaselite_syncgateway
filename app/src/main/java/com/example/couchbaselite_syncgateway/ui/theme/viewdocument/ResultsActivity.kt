@@ -65,7 +65,6 @@ class ResultsActivity : AppCompatActivity() {
 
             if (results.isEmpty()) {
                 Toast.makeText(this, "No documents found", Toast.LENGTH_SHORT).show()
-                return
             }
 
             // Prepare union of keys (excluding "docId")

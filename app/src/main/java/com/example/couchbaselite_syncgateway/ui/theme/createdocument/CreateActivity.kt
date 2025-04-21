@@ -29,9 +29,9 @@ class CreateActivity : AppCompatActivity() {
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
-        editTextId = findViewById<EditText>(R.id.editTextId)
-        editTextJson = findViewById<EditText>(R.id.editTextJson)
-        submitButton = findViewById<Button>(R.id.submitButton)
+        editTextId = findViewById(R.id.editTextId)
+        editTextJson = findViewById(R.id.editTextJson)
+        submitButton = findViewById(R.id.submitButton)
 
         val rootView: View = findViewById(R.id.createConstraintLayout)
         if (!rootView.isInEditMode) {
@@ -50,7 +50,6 @@ class CreateActivity : AppCompatActivity() {
 
             if (jsonInput.isEmpty()) {
                 Toast.makeText(this, "JSON input is required", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
             }
 
             // Check if user-entered ID already exists (only if an ID was provided)
@@ -61,7 +60,6 @@ class CreateActivity : AppCompatActivity() {
                         "Document with ID '$docIdInput' already exists.",
                         Toast.LENGTH_SHORT
                     ).show()
-                    return@setOnClickListener
                 }
             }
 
@@ -74,44 +72,34 @@ class CreateActivity : AppCompatActivity() {
 
                 val trimmedInput = jsonInput.trim()
                 if (trimmedInput.startsWith("[")) {
-                    // Input is a JSON array
+                    // Input is a JSON array; convert it to a Kotlin List.
                     val jsonArray = JSONArray(trimmedInput)
                     val list = mutableListOf<Any>()
                     for (i in 0 until jsonArray.length()) {
                         list.add(jsonArray.get(i))
                     }
-                    // Save the list under the key "list"
-                    mutableDocument.setValue("list", list)
+                    // Store the list under a default key "data".
+                    mutableDocument.setValue("data", list)
                 } else if (trimmedInput.startsWith("{")) {
-                    // Input is a JSON object; expect it to have a single key with an array value
+                    // Input is a JSON object.
                     val jsonObject = JSONObject(trimmedInput)
-                    if (jsonObject.length() != 1) {
-                        Toast.makeText(
-                            this,
-                            "JSON object must have a single key with an array value",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        return@setOnClickListener
+                    val keys = jsonObject.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        val value = jsonObject.get(key)
+                        if (value is JSONArray) {
+                            // Convert JSONArray to a Kotlin List.
+                            val list = mutableListOf<Any>()
+                            for (i in 0 until value.length()) {
+                                list.add(value.get(i))
+                            }
+                            mutableDocument.setValue(key, list)
+                        } else {
+                            mutableDocument.setValue(key, value)
+                        }
                     }
-                    val key = jsonObject.keys().next()
-                    val value = jsonObject.get(key)
-                    if (value !is JSONArray) {
-                        Toast.makeText(
-                            this,
-                            "The value for key '$key' is not a JSON array",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        return@setOnClickListener
-                    }
-                    val list = mutableListOf<Any>()
-                    for (i in 0 until value.length()) {
-                        list.add(value.get(i))
-                    }
-                    // Save the list under the same key
-                    mutableDocument.setValue(key, list)
                 } else {
                     Toast.makeText(this, "Invalid JSON input", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
                 }
 
                 if (dbManager.saveDocument(mutableDocument)) {
@@ -127,13 +115,14 @@ class CreateActivity : AppCompatActivity() {
                 editTextId.text.clear()
                 editTextJson.text.clear()
             } catch (e: JSONException) {
-                Toast.makeText(this, "Invalid list input: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Invalid JSON input: ${e.message}", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 Toast.makeText(this, "Error saving document: ${e.message}", Toast.LENGTH_SHORT)
                     .show()
             }
         }
     }
+
     override fun onSupportNavigateUp(): Boolean {
         finish()
         return true

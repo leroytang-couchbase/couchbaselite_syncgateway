@@ -14,7 +14,6 @@ import com.couchbase.lite.Expression
 import com.couchbase.lite.ListenerToken
 import com.couchbase.lite.Meta
 import com.couchbase.lite.MutableDocument
-import com.couchbase.lite.Query
 import com.couchbase.lite.QueryBuilder
 import com.couchbase.lite.Replicator
 import com.couchbase.lite.ReplicatorActivityLevel
@@ -29,12 +28,14 @@ import java.net.URISyntaxException
 import java.util.concurrent.atomic.AtomicReference
 import com.couchbase.lite.Collection as CBLCollection
 
-
 class DBManager private constructor() {
     var database: Database? = null
     var collection: CBLCollection? = null
     var syncGatewayEndpoint: String = "wss://xnjcgujv4ttuytrq.apps.cloud.couchbase.com:4984/demo"
-    var dbToken : ListenerToken? =null
+    var dbToken: ListenerToken? = null
+
+    // Add a replicator property to store the replicator instance.
+    private var replicator: Replicator? = null
 
     private fun init(context: Context) {
         CouchbaseLite.init(context)
@@ -88,11 +89,9 @@ class DBManager private constructor() {
         }
     }
 
-
-
     fun queryDocs() {
         val coll: CBLCollection = collection ?: return
-        val query: Query = QueryBuilder.select(SelectResult.all())
+        val query = QueryBuilder.select(SelectResult.all())
             .from(DataSource.collection(coll))
             .where(Expression.property("language").equalTo(Expression.string("Kotlin")))
         query.execute().use { rs ->
@@ -116,6 +115,7 @@ class DBManager private constructor() {
     companion object {
         private const val TAG = "DBManager"
         private val INSTANCE = AtomicReference<DBManager?>()
+
         @Synchronized
         fun getInstance(context: Context): DBManager {
             var mgr = INSTANCE.get()
@@ -165,74 +165,73 @@ class DBManager private constructor() {
         }
     }
 
-
-    fun startPushAndPullReplicationForCurrentUser(username: String, password: String) // end::startPushAndPullReplicationForCurrentUser[]
-    {
-        val username = "demo"
-        val password = "Pw12345!"
+    // Start push-pull replication using the provided credentials.
+    fun startPushAndPullReplicationForCurrentUser(
+        username: String,
+        password: String
+    ): Replicator {
         var url: URI? = null
         try {
-            // Supply both endpoint and database name ("demo")
             url = URI(String.format("%s", syncGatewayEndpoint))
         } catch (e: URISyntaxException) {
             e.printStackTrace()
         }
 
-        val coll: CBLCollection = collection ?: return
-        // Create the replicator configuration using the local database as the source.
-
-
+        val coll: CBLCollection = collection ?: throw IllegalStateException("Collection is not initialized")
         val config = ReplicatorConfiguration(URLEndpoint(url!!))
             .setType(ReplicatorType.PUSH_AND_PULL)
             .setContinuous(true)
             .setAcceptOnlySelfSignedServerCertificate(false)
-            .addCollection(coll,CollectionConfiguration())
-            .setAuthenticator(BasicAuthenticator(username,password.toCharArray()))
+            .addCollection(coll, CollectionConfiguration())
+            .setAuthenticator(BasicAuthenticator(username, password.toCharArray()))
 
+        Log.i("config", "$config")
 
-        Log.i("config","$config")
-
-        // Create the replicator instance.
-        val replicator = Replicator(config)
+        // Create the replicator instance and assign it to our property.
+        replicator = Replicator(config)
 
         // Add a change listener to log replication status.
-        replicator.addChangeListener { change ->
-            Log.d("Replication", "Activity level: ${change.status.activityLevel}")
+        replicator?.addChangeListener { change ->
+            Log.d(TAG, "Replication activity level: ${change.status.activityLevel}")
             if (change.status.activityLevel == ReplicatorActivityLevel.BUSY ||
-                change.status.activityLevel == ReplicatorActivityLevel.IDLE) {
-                Log.i("Replication", "Replication started successfully.")
+                change.status.activityLevel == ReplicatorActivityLevel.IDLE
+            ) {
+                Log.i(TAG, "Replication started successfully.")
             }
             change.status.error?.let { error ->
-                Log.e("Replication", "Replication error: $error")
+                Log.e(TAG, "Replication error: ${error.message}", error)
             }
         }
 
-        val replicatorState = replicator.replicatorChangesFlow()
-            .map { it.status.activityLevel}
+        // Optional: observe replicator state with a flow.
+        val replicatorState = replicator!!.replicatorChangesFlow()
+            .map { it.status.activityLevel }
             .asLiveData()
-        Log.i("ReplicatorState", "${replicatorState.toString()}")
+        Log.i(TAG, "Replicator state: $replicatorState")
 
-        val token = replicator.addDocumentReplicationListener { replication ->
-            Log.d("Replication:","Replication type: " + (if ((replication.isPush())) "push" else "pull"))
+        val token = replicator!!.addDocumentReplicationListener { replication ->
+            Log.d(TAG, "Replication type: " + if (replication.isPush()) "push" else "pull")
             for (document in replication.getDocuments()) {
-                Log.e("Doc ID:","Doc ID: " + document.id)
-
-                val err = document.error
-                if (err != null) {
-                    // There was an error
-                    Log.e("Error replicating document: ", "$err")
+                Log.e(TAG, "Doc ID: " + document.id)
+                document.error?.let { err ->
+                    Log.e(TAG, "Error replicating document: $err")
                     return@addDocumentReplicationListener
                 }
-
                 if (document.flags.contains(DocumentFlag.DELETED)) {
-                    Log.d("Success:","Successfully replicated a deleted document")
+                    Log.d(TAG, "Successfully replicated a deleted document")
                 }
             }
         }
 
-        // Start replication.
-        replicator.start()
+        replicator!!.start()
         dbToken = token
+        return replicator!!
     }
 
+    // Stop replication.
+    fun stopReplication() {
+        replicator?.stop()
+        replicator = null
+        Log.i(TAG, "Replication stopped")
+    }
 }

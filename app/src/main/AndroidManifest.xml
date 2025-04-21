@@ -15,7 +15,7 @@
 
         <!-- MainActivity: the launcher/home screen -->
         <activity
-            android:name=".ui.theme.mainscreen.MainActivity"
+            android:name=".ui.theme.login.LoginScreen"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.Couchbaselite_syncgateway">
@@ -24,6 +24,13 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+        <!-- MainActivity: the launcher/home screen -->
+        <activity
+            android:name=".ui.theme.mainscreen.MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Couchbaselite_syncgateway">
         </activity>
 
         <!-- CreateActivity: for inserting new documents -->
